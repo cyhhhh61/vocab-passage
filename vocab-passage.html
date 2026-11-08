@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>打乱的单词 · 连成一段话</title>
+<style>
+  :root{
+    --paper:#f7f2e8;
+    --paper-2:#fffdf7;
+    --ink:#241f1a;
+    --ink-2:#5c5348;
+    --line:#e0d5c1;
+    --accent:#b8452f;
+    --accent-soft:#f6e3d6;
+    --known:#fbeecb;
+    --v:#2f6f6a;
+    --n:#8a5a2b;
+    --adj:#6b52a3;
+    --adv:#3f6ea8;
+    --shadow:0 18px 50px -20px rgba(60,40,20,.45), 0 2px 8px rgba(60,40,20,.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #fffdf6 0%, rgba(255,253,246,0) 60%),
+      radial-gradient(900px 500px at 100% 100%, #f0e5d2 0%, rgba(240,229,210,0) 55%),
+      var(--paper);
+    color:var(--ink);
+    font-family:"Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  /* paper grain */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.16'/%3E%3C/svg%3E");
+  }
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:46px 22px 230px;}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:26px;}
+  .kicker{
+    font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent);
+    display:flex;align-items:center;gap:10px;margin-bottom:10px;
+  }
+  .kicker::after{content:"";height:1px;width:56px;background:var(--accent);opacity:.5;}
+  h1{
+    font-family:"Songti SC","Noto Serif SC",Georgia,serif;
+    font-size:clamp(26px,3.6vw,40px);line-height:1.2;margin:0;font-weight:600;letter-spacing:.01em;
+  }
+  h1 em{font-style:normal;color:var(--accent);}
+  .sub{margin:10px 0 0;color:var(--ink-2);font-size:14px;line-height:1.7;max-width:44em;}
+  .stat{text-align:right;min-width:132px;}
+  .stat b{font-family:Georgia,serif;font-size:34px;line-height:1;font-weight:400;}
+  .stat b span{font-size:15px;color:var(--ink-2);}
+  .stat b span#cnt{font-size:38px;color:var(--ink);}
+  .stat small{display:block;font-size:11px;letter-spacing:.18em;color:var(--ink-2);margin-top:6px;text-transform:uppercase;}
+  .bar{height:4px;background:var(--line);border-radius:99px;margin-top:10px;overflow:hidden;}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .45s cubic-bezier(.2,.8,.2,1);}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:6px;margin:0 0 20px;border-bottom:1px solid var(--line);}
+  .tab{
+    appearance:none;border:0;background:transparent;cursor:pointer;
+    font:inherit;font-size:14px;color:var(--ink-2);padding:10px 4px;margin-right:22px;
+    border-bottom:2px solid transparent;transition:.2s;
+  }
+  .tab:hover{color:var(--ink);}
+  .tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600;}
+
+  /* ---------- passage ---------- */
+  .sheet{
+    background:linear-gradient(180deg,var(--paper-2),#fdfaf2);
+    border:1px solid var(--line);
+    border-radius:4px;
+    box-shadow:var(--shadow);
+    padding:clamp(24px,4.2vw,54px) clamp(20px,4.6vw,64px);
+    position:relative;
+  }
+  .sheet::before{
+    content:"Section 01 · 一段被拆散的故事";position:absolute;top:-9px;left:clamp(20px,4.6vw,64px);
+    background:var(--paper);padding:0 10px;font-size:10px;letter-spacing:.26em;color:var(--ink-2);
+  }
+  #passage p{
+    font-family:Georgia,"Times New Roman","Songti SC",serif;
+    font-size:clamp(17px,1.55vw,20px);
+    line-height:2.15;
+    margin:0 0 1.15em;
+    color:#2b2620;
+  }
+  #passage p:first-child::first-letter{
+    float:left;font-size:3.1em;line-height:.84;padding:6px 5px 0 0;color:var(--accent);
+    font-family:Georgia,serif;
+  }
+  #passage p.zh{
+    display:none;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    font-size:14.5px;line-height:2.0;color:#6f6457;
+    margin:-.55em 0 1.7em;padding-left:15px;
+    border-left:2px solid rgba(184,69,47,.22);
+    letter-spacing:.01em;
+  }
+  body.trans #passage p.zh{display:block;}
+  #passage p.zh::first-letter{float:none;font-size:inherit;color:inherit;padding:0;}
+  #passage p.zh:last-child{margin-bottom:0;}
+
+  w{
+    cursor:pointer;position:relative;
+    border-bottom:1px dashed transparent;
+    padding:1px 1px 0;border-radius:2px;
+    transition:background .16s, color .16s, border-color .16s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  w[data-k]{border-bottom-color:rgba(184,69,47,.45);}
+  w:hover{background:rgba(184,69,47,.09);border-bottom-color:rgba(184,69,47,.5);}
+  w:focus{outline:none;background:rgba(184,69,47,.09);}
+  w.seen{background:var(--known);border-bottom-color:rgba(184,69,47,.75);}
+  w[data-k]:hover{background:var(--accent-soft);}
+  w.active,w[data-k].active{background:var(--accent);color:#fff8ef;border-bottom-color:transparent;}
+
+  /* inline chinese gloss */
+  w[data-cn]::after{
+    content:attr(data-cn);
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:.56em;color:var(--accent);
+    display:none;
+  }
+  body.gloss #passage w{display:inline-block;}
+  body.gloss #passage p:first-child w:first-child{display:inline;}
+  body.gloss w[data-k][data-cn]::after{
+    display:inline-block;margin-left:.25em;vertical-align:.35em;letter-spacing:.02em;
+    color:var(--accent);
+  }
+  @media print{
+    w[data-k][data-cn]::after{display:inline-block !important;margin-left:.25em;}
+    #passage p.zh{display:block !important;}
+    .tools{display:none;}
+  }
+
+  /* ---------- popover ---------- */
+  #pop{
+    position:fixed;z-index:60;pointer-events:none;opacity:0;transform:translateY(6px) scale(.97);
+    transition:opacity .16s ease, transform .16s cubic-bezier(.2,.8,.2,1);
+    min-width:196px;max-width:280px;
+    background:#26211c;color:#fbf3e6;border-radius:10px;padding:14px 16px 13px;
+    box-shadow:0 22px 48px -16px rgba(20,12,4,.55);
+  }
+  #pop.on{opacity:1;transform:translateY(0) scale(1);}
+  #pop::after{
+    content:"";position:absolute;left:var(--ax,50%);bottom:-6px;transform:translateX(-50%) rotate(45deg);
+    width:12px;height:12px;background:#26211c;border-radius:2px;
+  }
+  #pop.below::after{bottom:auto;top:-6px;}
+  #pop .w{font-family:Georgia,serif;font-size:22px;line-height:1.2;letter-spacing:.01em;}
+  #pop .row{display:flex;align-items:baseline;gap:9px;margin-bottom:6px;}
+  #pop .pos{
+    font-size:10px;letter-spacing:.1em;padding:2px 6px;border-radius:3px;
+    background:rgba(255,255,255,.14);color:#ffdfc9;text-transform:lowercase;
+  }
+  #pop .cn{font-size:15px;line-height:1.65;color:#ffe9d6;}
+  #pop .tag{
+    font-size:9px;letter-spacing:.1em;padding:2px 5px;border-radius:3px;
+    background:rgba(184,69,47,.9);color:#fff3e6;
+  }
+  #pop .base{
+    font-size:11px;color:rgba(251,243,230,.52);margin-top:6px;letter-spacing:.02em;
+  }
+  #pop .en{font-size:12px;line-height:1.6;color:rgba(251,243,230,.62);margin-top:7px;border-top:1px solid rgba(255,255,255,.12);padding-top:7px;}
+
+  /* ---------- legend ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:18px;margin:18px 2px 0;font-size:12px;color:var(--ink-2);}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:0;}
+
+  /* ---------- buttons ---------- */
+  .tools{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:50;
+    display:flex;align-items:center;gap:4px;padding:7px;
+    background:rgba(38,33,28,.94);backdrop-filter:blur(10px);
+    border-radius:99px;box-shadow:0 20px 40px -16px rgba(30,18,6,.6);
+  }
+  .tools button{
+    appearance:none;border:0;background:transparent;color:#f4e9d9;cursor:pointer;
+    font:inherit;font-size:13px;padding:9px 16px;border-radius:99px;transition:.18s;white-space:nowrap;
+  }
+  .tools button:hover{background:rgba(255,255,255,.12);}
+  .tools button.on{background:var(--accent);color:#fff;}
+  .tools #btnShuffle{display:none;}
+  body.cardmode #btnShuffle{display:inline-block;}
+  body.cardmode #btnGloss,
+  body.cardmode #btnTrans{display:none;}
+  .tools .sep{width:1px;height:20px;background:rgba(255,255,255,.18);margin:0 4px;display:none;}
+  body.cardmode .tools .sep{display:inline-block;}
+  @media (max-width:560px){
+    .tools{width:calc(100% - 24px);justify-content:space-between;}
+    .tools button{padding:9px 10px;font-size:12px;}
+  }
+
+  /* ---------- cards tab ---------- */
+  #cards{display:none;}
+  .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px;}
+  .card{
+    position:relative;border:1px solid var(--line);background:var(--paper-2);
+    border-radius:8px;padding:14px 14px 13px;cursor:pointer;overflow:hidden;
+    transition:.2s;min-height:86px;display:flex;flex-direction:column;justify-content:center;
+  }
+  .card:hover{border-color:#cdbfa6;transform:translateY(-2px);box-shadow:0 10px 22px -14px rgba(60,40,20,.5);}
+  .card .en{font-family:Georgia,serif;font-size:16px;line-height:1.3;}
+  .card .cn{
+    font-size:11.5px;color:var(--accent);line-height:1.5;margin-top:5px;
+    max-height:0;opacity:0;overflow:hidden;transition:.28s;
+  }
+  .card.open{background:#fff8ec;border-color:rgba(184,69,47,.45);}
+  .card.open .cn{max-height:60px;opacity:1;}
+  .card .idx{position:absolute;right:9px;top:8px;font-size:9.5px;color:#b9aa90;font-family:Georgia,serif;}
+  .hint{margin:0 0 16px;font-size:13px;color:var(--ink-2);}
+  .src{margin:16px 4px 0;font-size:11.5px;line-height:1.8;color:#a2937c;max-width:60em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="kicker">Vocabulary · 103 words</div>
+      <h1>把单词<em>打乱</em>，连成一段话</h1>
+      <p class="sub">这 103 个词来自你的手写词表，已重新排序嵌入下面这个故事。<b>全文每个单词都能点</b>——带虚线的 103 个是你的重点词（计入进度），其余是句中普通词。底部「译文」展开每段中文全文，「对照」给重点词逐词标注中文。</p>
+    </div>
+    <div class="stat">
+      <b><span id="cnt">0</span><span id="total">/103</span></b>
+      <small>已查看</small>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="read">① 一段话</button>
+    <button class="tab" data-tab="card">② 乱序词卡</button>
+  </div>
+
+  <!-- ============ 阅读 ============ -->
+  <section id="read">
+    <div class="sheet">
+      <div id="passage">
+
+<p><w data-w="at">At</w> <w data-w="the">the</w> <w data-w="outset" data-k="outset">outset</w>, <w data-w="the">the</w> <w data-w="report">report</w> <w data-w="was">was</w> <w data-w="brief" data-k="brief">brief</w> <w data-w="and">and</w> <w data-w="fairly" data-k="fairly">fairly</w> <w data-w="ordinary">ordinary</w>: <w data-w="a">a</w> <w data-w="rail" data-k="rail">rail</w> <w data-w="line">line</w>, <w data-w="a">a</w> <w data-w="warehouse">warehouse</w> <w data-w="zone" data-k="zone">zone</w>, <w data-w="a">a</w> <w data-w="paragraph" data-k="paragraph">paragraph</w> <w data-w="about">about</w> <w data-w="freight">freight</w>. <w data-w="but">But</w> <w data-w="the">the</w> <w data-w="numbers">numbers</w> <w data-w="began">began</w> <w data-w="to">to</w> <w data-w="vary" data-k="vary">vary</w> <w data-w="in">in</w> <w data-w="ways">ways</w> <w data-w="no">no</w> <w data-w="one">one</w> <w data-w="could">could</w> <w data-w="specify" data-k="specify">specify</w>. <w data-w="a">A</w> <w data-w="young">young</w> <w data-w="specialist" data-k="specialist">specialist</w> <w data-w="from">from</w> <w data-w="the">the</w> <w data-w="statistics">statistics</w> <w data-w="bureau">bureau</w> <w data-w="was">was</w> <w data-w="asked">asked</w> <w data-w="to">to</w> <w data-w="compile" data-k="compile">compile</w> <w data-w="them">them</w>, <w data-w="compare" data-k="compare">compare</w> <w data-w="one">one</w> <w data-w="month">month</w> <w data-w="with">with</w> <w data-w="the">the</w> <w data-w="next">next</w>, <w data-w="and">and</w> <w data-w="estimate" data-k="estimate">estimate</w> <w data-w="the">the</w> <w data-w="percentage" data-k="percentage">percentage</w> <w data-w="of">of</w> <w data-w="goods" data-k="goods">goods</w> <w data-w="that">that</w> <w data-w="never">never</w> <w data-w="reached">reached</w> <w data-w="the">the</w> <w data-w="market">market</w>. <w data-w="no">No</w> <w data-w="one">one</w> <w data-w="could">could</w> <w data-w="explain">explain</w> <w data-w="why">why</w>; <w data-w="some">some</w> <w data-w="began">began</w> <w data-w="to">to</w> <w data-w="speculate" data-k="speculate">speculate</w> <w data-w="about">about</w> <w data-w="a">a</w> <w data-w="weird" data-k="weird">weird</w> <w data-w="error">error</w> <w data-w="in">in</w> <w data-w="the">the</w> <w data-w="new">new</w> <w data-w="software">software</w>. <w data-w="her">Her</w> <w data-w="employer" data-k="employer">employer</w> <w data-w="gave">gave</w> <w data-w="her">her</w> <w data-w="wide">wide</w> <w data-w="scope" data-k="scope">scope</w> <w data-w="and">and</w> <w data-w="one">one</w> <w data-w="simple">simple</w> <w data-w="aim" data-k="aim">aim</w>: <w data-w="find">find</w> <w data-w="the">the</w> <w data-w="variation" data-k="variation">variation</w>, <w data-w="trace" data-k="trace">trace</w> <w data-w="it">it</w>, <w data-w="terminate" data-k="terminate">terminate</w> <w data-w="it">it</w> — <w data-w="before">before</w> <w data-w="the">the</w> <w data-w="town's">town's</w> <w data-w="welfare" data-k="welfare">welfare</w> <w data-w="budget">budget</w> <w data-w="took">took</w> <w data-w="another">another</w> <w data-w="hit">hit</w>.</p>
+
+<p class="zh" lang="zh-CN">一开始，这份报告简短而相当平常：一条铁路线、一个仓库区、一段关于货运的文字。但数字开始以一种谁也说不清的方式变化。统计局一位年轻的专员被派来汇编这些数据，把一个月和下一个月作比较，并估算那些从未进入市场的货物占多大比例。没人能解释原因；有人开始猜测是新软件里出了个奇怪的错误。她的雇主给了她很大的权限，目标却只有一个：找到那处异常，追出它的去向，在它再一次掏空镇上的福利预算之前把它掐断。</p>
+
+<p><w data-w="the">The</w> <w data-w="first">first</w> <w data-w="indication" data-k="indication">indication</w> <w data-w="was">was</w> <w data-w="a">a</w> <w data-w="vague" data-k="vague">vague</w> <w data-w="whisper" data-k="whisper">whisper</w> <w data-w="in">in</w> <w data-w="the">the</w> <w data-w="ledger">ledger</w>: <w data-w="shipments">shipments</w> <w data-w="that">that</w> <w data-w="seemed">seemed</w> <w data-w="to">to</w> <w data-w="vanish" data-k="vanish">vanish</w> <w data-w="and">and</w> <w data-w="then">then</w> <w data-w="return">return</w> <w data-w="under">under</w> <w data-w="an">an</w> <w data-w="alternate" data-k="alternate">alternate</w> <w data-w="name">name</w>. <w data-w="to">To</w> <w data-w="a">a</w> <w data-w="weary" data-k="weary">weary</w> <w data-w="clerk">clerk</w> <w data-w="this">this</w> <w data-w="was">was</w> <w data-w="no">no</w> <w data-w="more">more</w> <w data-w="than">than</w> <w data-w="random" data-k="random">random</w> <w data-w="noise">noise</w>, <w data-w="but">but</w> <w data-w="the">the</w> <w data-w="specialist" data-k="specialist">specialist</w> <w data-w="had">had</w> <w data-w="learned">learned</w> <w data-w="never">never</w> <w data-w="to">to</w> <w data-w="underestimate" data-k="underestimate">underestimate</w> <w data-w="a">a</w> <w data-w="small">small</w> <w data-w="variance" data-k="variance">variance</w>. <w data-w="she">She</w> <w data-w="set">set</w> <w data-w="a">a</w> <w data-w="tentative" data-k="tentative">tentative</w> <w data-w="target" data-k="target">target</w>, <w data-w="allocated" data-k="allocate">allocated</w> <w data-w="two">two</w> <w data-w="assistants">assistants</w> <w data-w="to">to</w> <w data-w="the">the</w> <w data-w="task">task</w>, <w data-w="and">and</w> <w data-w="began">began</w> <w data-w="to">to</w> <w data-w="track" data-k="track">track</w> <w data-w="every">every</w> <w data-w="entry">entry</w> <w data-w="with">with</w> <w data-w="the">the</w> <w data-w="emphasis" data-k="emphasis">emphasis</w> <w data-w="of">of</w> <w data-w="someone">someone</w> <w data-w="building">building</w> <w data-w="a">a</w> <w data-w="case">case</w> <w data-w="for">for</w> <w data-w="court">court</w>. <w data-w="the">The</w> <w data-w="totals">totals</w> <w data-w="seemed">seemed</w> <w data-w="to">to</w> <w data-w="indicate" data-k="indicate">indicate</w> <w data-w="a">a</w> <w data-w="simple">simple</w> <w data-w="mistake">mistake</w>. <w data-w="when">When</w> <w data-w="the">the</w> <w data-w="aggregate" data-k="aggregate">aggregate</w> <w data-w="came">came</w> <w data-w="out">out</w>, <w data-w="however">however</w>, <w data-w="the">the</w> <w data-w="alarm" data-k="alarm">alarm</w> <w data-w="went">went</w> <w data-w="off">off</w>: <w data-w="this">this</w> <w data-w="was">was</w> <w data-w="not">not</w> <w data-w="a">a</w> <w data-w="partial" data-k="partial">partial</w> <w data-w="error">error</w> <w data-w="but">but</w> <w data-w="a">a</w> <w data-w="complete" data-k="complete">complete</w> <w data-w="alteration" data-k="alteration">alteration</w> <w data-w="of">of</w> <w data-w="the">the</w> <w data-w="record">record</w>.</p>
+
+<p class="zh" lang="zh-CN">最早的迹象，是账簿里一句含糊的低语：有些货似乎消失了，随后又换了个名字回来。在一位疲惫的职员看来，这不过是随机的噪声；但这位专员早就学会绝不小看一处小小的偏差。她定下一个试探性的目标，拨了两名助手做这件事，然后像给法庭准备证据一样，开始逐条追踪每一笔记录。各项合计似乎表明只是个小错。然而当汇总数出来时，警报响了：这不是局部的差错，而是整份记录的彻底改动。</p>
+
+<p><w data-w="each">Each</w> <w data-w="special" data-k="special">special</w> <w data-w="case">case</w> <w data-w="had">had</w> <w data-w="a">a</w> <w data-w="twin">twin</w> — <w data-w="no">no</w> <w data-w="single">single</w> <w data-w="specific" data-k="specific">specific</w> <w data-w="entry">entry</w> <w data-w="proved">proved</w> <w data-w="anything">anything</w> — <w data-w="yet">yet</w> <w data-w="the">the</w> <w data-w="pattern">pattern</w> <w data-w="held">held</w>, <w data-w="comparable" data-k="comparable">comparable</w> <w data-w="across">across</w> <w data-w="the">the</w> <w data-w="whole">whole</w> <w data-w="range" data-k="range">range</w> <w data-w="of">of</w> <w data-w="accounts">accounts</w>. <w data-w="one">One</w> <w data-w="line">line</w> <w data-w="was">was</w> <w data-w="indicative" data-k="indicative">indicative</w> <w data-w="of">of</w> <w data-w="a">a</w> <w data-w="larger">larger</w> <w data-w="bias" data-k="bias">bias</w>: <w data-w="the">the</w> <w data-w="same">same</w> <w data-w="few">few</w> <w data-w="names">names</w>, <w data-w="again">again</w> <w data-w="and">and</w> <w data-w="again">again</w>, <w data-w="always">always</w> <w data-w="on">on</w> <w data-w="the">the</w> <w data-w="side">side</w> <w data-w="that">that</w> <w data-w="scored" data-k="score">scored</w> <w data-w="best">best</w>. "<w data-w="do">Do</w> <w data-w="not">not</w> <w data-w="deny" data-k="deny">deny</w> <w data-w="what">what</w> <w data-w="the">the</w> <w data-w="page">page</w> <w data-w="shows">shows</w> <w data-w="you">you</w>," <w data-w="her">her</w> <w data-w="mentor">mentor</w> <w data-w="said">said</w>. "<w data-w="testify" data-k="testify">Testify</w> <w data-w="only">only</w> <w data-w="to">to</w> <w data-w="what">what</w> <w data-w="is">is</w> <w data-w="valid" data-k="valid">valid</w>." <w data-w="he">He</w> <w data-w="was">was</w> <w data-w="competent" data-k="competent">competent</w> <w data-w="but">but</w> <w data-w="careful">careful</w>, <w data-w="and">and</w> <w data-w="he">he</w> <w data-w="warned">warned</w> <w data-w="her">her</w> <w data-w="that">that</w> <w data-w="a">a</w> <w data-w="temporary" data-k="temporary">temporary</w> <w data-w="gap">gap</w> <w data-w="in">in</w> <w data-w="the">the</w> <w data-w="books">books</w> <w data-w="could">could</w> <w data-w="aggravate" data-k="aggravate">aggravate</w> <w data-w="a">a</w> <w data-w="temporal" data-k="temporal">temporal</w> <w data-w="one">one</w> — <w data-w="a">a</w> <w data-w="delay">delay</w> <w data-w="that">that</w> <w data-w="would">would</w> <w data-w="look">look</w> <w data-w="exactly">exactly</w> <w data-w="like">like</w> <w data-w="fraud">fraud</w>.</p>
+
+<p class="zh" lang="zh-CN">每个特别的个案都有它的孪生兄弟——单看任何一笔具体记录都证明不了什么——可这个模式始终成立，在整片账目范围内都彼此吻合。其中一行暗示着更大的偏袒：总是那么几个名字，一次又一次，永远落在得分最高的那一边。“别否认账页给你看的东西，”她的导师说，“只为你确认有效的部分作证。”他能力很强，为人却谨慎，并提醒她：账上暂时的空缺，可能会加重时间上的空缺——那种延迟，看上去会和做假账一模一样。</p>
+
+<p><w data-w="the">The</w> <w data-w="case">case</w> <w data-w="compelled" data-k="compel">compelled</w> <w data-w="her">her</w> <w data-w="to">to</w> <w data-w="undergo" data-k="undergo">undergo</w> <w data-w="months">months</w> <w data-w="of">of</w> <w data-w="dull">dull</w> <w data-w="work">work</w>. <w data-w="she">She</w> <w data-w="would">would</w> <w data-w="alternate" data-k="alternate">alternate</w> <w data-w="between">between</w> <w data-w="the">the</w> <w data-w="office">office</w> <w data-w="and">and</w> <w data-w="the">the</w> <w data-w="docks">docks</w>, <w data-w="wearing" data-k="wear">wearing</w> <w data-w="out">out</w> <w data-w="two">two</w> <w data-w="pairs">pairs</w> <w data-w="of">of</w> <w data-w="shoes">shoes</w> <w data-w="and">and</w> <w data-w="compensating" data-k="compensate">compensating</w> <w data-w="for">for</w> <w data-w="every">every</w> <w data-w="lost">lost</w> <w data-w="hour">hour</w> <w data-w="with">with</w> <w data-w="an">an</w> <w data-w="hour">hour</w> <w data-w="stolen">stolen</w> <w data-w="from">from</w> <w data-w="sleep">sleep</w>. <w data-w="her">Her</w> <w data-w="peers" data-k="peer">peers</w> <w data-w="called">called</w> <w data-w="her">her</w> <w data-w="aggressive" data-k="aggressive">aggressive</w>; <w data-w="she">she</w> <w data-w="preferred">preferred</w> <w data-w="to">to</w> <w data-w="think">think</w> <w data-w="of">of</w> <w data-w="herself">herself</w> <w data-w="as">as</w> <w data-w="brisk" data-k="brisk">brisk</w>. "<w data-w="you">You</w> <w data-w="cannot">cannot</w> <w data-w="oppress" data-k="oppress">oppress</w> <w data-w="a">a</w> <w data-w="ledger">ledger</w>," <w data-w="she">she</w> <w data-w="joked">joked</w>, "<w data-w="but">but</w> <w data-w="you">you</w> <w data-w="can">can</w> <w data-w="outlast">outlast</w> <w data-w="it">it</w>." <w data-w="at">At</w> <w data-w="times">times</w> <w data-w="fear" data-k="fear">fear</w> <w data-w="would">would</w> <w data-w="whirl" data-k="whirl">whirl</w> <w data-w="through">through</w> <w data-w="her">her</w> <w data-w="and">and</w> <w data-w="she">she</w> <w data-w="would">would</w> <w data-w="look">look</w> <w data-w="for">for</w> <w data-w="any">any</w> <w data-w="opportunity" data-k="opportunity">opportunity</w> <w data-w="to">to</w> <w data-w="quit">quit</w>; <w data-w="then">then</w> <w data-w="the">the</w> <w data-w="charm" data-k="charm">charm</w> <w data-w="of">of</w> <w data-w="the">the</w> <w data-w="puzzle">puzzle</w> <w data-w="came">came</w> <w data-w="back">back</w>, <w data-w="and">and</w> <w data-w="she">she</w> <w data-w="would">would</w> <w data-w="endorse" data-k="endorse">endorse</w> <w data-w="her">her</w> <w data-w="own">own</w> <w data-w="stubbornness">stubbornness</w>.</p>
+
+<p class="zh" lang="zh-CN">这个案子逼着她熬过了几个月枯燥的工作。她在办公室和码头之间来回轮转，穿坏了两双鞋，每丢掉一个小时，就从睡眠里偷一个小时补回来。同行说她太好斗；她更愿意把自己看成办事爽利。“你压迫不了一本账簿，”她打趣道，“但你可以比它撑得更久。”有时恐惧会在她心里打转，她会抓住任何一个可以退出的机会；可随后谜题本身的魅力又回来了，她便再一次认可自己的固执。</p>
+
+<p><w data-w="the">The</w> <w data-w="answer">answer</w>, <w data-w="when">when</w> <w data-w="it">it</w> <w data-w="came">came</w>, <w data-w="was">was</w> <w data-w="almost">almost</w> <w data-w="agreeable" data-k="agreeable">agreeable</w> <w data-w="in">in</w> <w data-w="its">its</w> <w data-w="simplicity">simplicity</w>. <w data-w="it">It</w> <w data-w="had">had</w> <w data-w="been">been</w> <w data-w="a">a</w> <w data-w="quiet">quiet</w>, <w data-w="almost">almost</w> <w data-w="gentlemanly">gentlemanly</w> <w data-w="endeavor" data-k="endeavor">endeavor</w>: <w data-w="a">a</w> <w data-w="clerk">clerk</w> <w data-w="had">had</w> <w data-w="been">been</w> <w data-w="paid">paid</w> <w data-w="to">to</w> <w data-w="agitate" data-k="agitate">agitate</w> <w data-w="on">on</w> <w data-w="behalf">behalf</w> <w data-w="of">of</w> <w data-w="a">a</w> <w data-w="rival">rival</w> <w data-w="firm">firm</w>; <w data-w="his">his</w> <w data-w="opponent" data-k="opponent">opponent</w> <w data-w="in">in</w> <w data-w="the">the</w> <w data-w="union">union</w> <w data-w="helped">helped</w> <w data-w="him">him</w> <w data-w="alter" data-k="alter">alter</w> <w data-w="the">the</w> <w data-w="invoices">invoices</w>, <w data-w="and">and</w> <w data-w="the">the</w> <w data-w="alteration" data-k="alteration">alteration</w> <w data-w="spread">spread</w> <w data-w="like">like</w> <w data-w="ink">ink</w> <w data-w="in">in</w> <w data-w="water">water</w>, <w data-w="beginning">beginning</w> <w data-w="to">to</w> <w data-w="diffuse" data-k="diffuse">diffuse</w> <w data-w="through">through</w> <w data-w="every">every</w> <w data-w="department">department</w>. <w data-w="the">The</w> <w data-w="market">market</w> <w data-w="had">had</w> <w data-w="always">always</w> <w data-w="been">been</w> <w data-w="competitive" data-k="competitive">competitive</w>, <w data-w="and">and</w> <w data-w="the">the</w> <w data-w="competition" data-k="competition">competition</w> <w data-w="itself">itself</w> <w data-w="had">had</w> <w data-w="been">been</w> <w data-w="fair" data-k="fair">fair</w>; <w data-w="the">the</w> <w data-w="rival">rival</w> <w data-w="had">had</w> <w data-w="simply">simply</w> <w data-w="chosen">chosen</w> <w data-w="to">to</w> <w data-w="compete" data-k="compete">compete</w> <w data-w="by">by</w> <w data-w="other">other</w> <w data-w="means">means</w>. <w data-w="he">He</w> <w data-w="was">was</w> <w data-w="offered">offered</w> <w data-w="an">an</w> <w data-w="alternative" data-k="alternative">alternative</w> — <w data-w="resign">resign</w>, <w data-w="and">and</w> <w data-w="keep">keep</w> <w data-w="his">his</w> <w data-w="pension">pension</w> — <w data-w="and">and</w> <w data-w="he">he</w> <w data-w="took">took</w> <w data-w="it">it</w>. <w data-w="for">For</w> <w data-w="one">one</w> <w data-w="brief" data-k="brief">brief</w> <w data-w="season">season</w> <w data-w="he">he</w> <w data-w="enjoyed">enjoyed</w> <w data-w="the">the</w> <w data-w="advantage">advantage</w> — <w data-w="then">then</w> <w data-w="came">came</w> <w data-w="an">an</w> <w data-w="outraged" data-k="outrage">outraged</w> <w data-w="employer" data-k="employer">employer</w>, <w data-w="a">a</w> <w data-w="charge">charge</w> <w data-w="of">of</w> <w data-w="fraud">fraud</w>, <w data-w="and">and</w> <w data-w="the">the</w> <w data-w="term" data-k="term">term</w> <w data-w="of">of</w> <w data-w="his">his</w> <w data-w="contract">contract</w> <w data-w="was">was</w> <w data-w="cut">cut</w> <w data-w="short">short</w>. <w data-w="the">The</w> <w data-w="board">board</w> <w data-w="wanted">wanted</w> <w data-w="a">a</w> <w data-w="quiet">quiet</w> <w data-w="settlement">settlement</w>; <w data-w="her">her</w> <w data-w="mentor">mentor</w> <w data-w="was">was</w> <w data-w="the">the</w> <w data-w="first">first</w> <w data-w="to">to</w> <w data-w="oppose" data-k="oppose">oppose</w> <w data-w="it">it</w>.</p>
+
+<p class="zh" lang="zh-CN">答案揭晓时，简单得几乎令人愉快。这件事从头到尾干得安安静静，甚至有点体面：一名职员被收买，替一家对手公司煽风点火；他在工会里的对头帮着他改发票，而改动像水里的墨一样散开，开始扩散到每一个部门。市场一向竞争激烈，竞争本身也是公平的；那家对手不过是选择了用别的手段来争。有人给了他一个替代方案——辞职，保留养老金——他接受了。短短一季，他享受着这点优势；随后迎来的是一位暴怒的雇主、一项欺诈指控，以及被提前终止的合同期限。董事会想悄悄了结，第一个站出来反对的，是她的导师。</p>
+
+<p><w data-w="on">On</w> <w data-w="the">the</w> <w data-w="day">day</w> <w data-w="the">the</w> <w data-w="case">case</w> <w data-w="closed">closed</w>, <w data-w="the">the</w> <w data-w="town">town</w> <w data-w="met">met</w> <w data-w="in">in</w> <w data-w="the">the</w> <w data-w="old">old</w> <w data-w="opera" data-k="opera">opera</w> <w data-w="house">house</w> — <w data-w="the">the</w> <w data-w="one">one</w> <w data-w="place">place</w> <w data-w="where">where</w>, <w data-w="in">in</w> <w data-w="a">a</w> <w data-w="democracy" data-k="democracy">democracy</w>, <w data-w="anyone">anyone</w> <w data-w="may">may</w> <w data-w="complain" data-k="complain">complain</w> <w data-w="aloud">aloud</w> <w data-w="without">without</w> <w data-w="being">being</w> <w data-w="alienated" data-k="alienate">alienated</w>. <w data-w="the">The</w> <w data-w="mayor">mayor</w> <w data-w="used">used</w> <w data-w="the">the</w> <w data-w="evening">evening</w> <w data-w="to">to</w> <w data-w="highlight" data-k="highlight">highlight</w> <w data-w="the">the</w> <w data-w="underlying" data-k="underlying">underlying</w> <w data-w="weakness">weakness</w> <w data-w="of">of</w> <w data-w="the">the</w> <w data-w="system">system</w>: <w data-w="too">too</w> <w data-w="much">much</w> <w data-w="trust">trust</w>, <w data-w="too">too</w> <w data-w="little">little</w> <w data-w="checking">checking</w>. "<w data-w="we">We</w> <w data-w="had">had</w> <w data-w="grown">grown</w> <w data-w="alien" data-k="alien">alien</w> <w data-w="to">to</w> <w data-w="our">our</w> <w data-w="own">own</w> <w data-w="accounts">accounts</w>," <w data-w="he">he</w> <w data-w="said">said</w>. "<w data-w="that">That</w> <w data-w="is">is</w> <w data-w="the">the</w> <w data-w="utter" data-k="utter">utter</w> <w data-w="shame">shame</w> <w data-w="of">of</w> <w data-w="it">it</w>." <w data-w="a">A</w> <w data-w="committee">committee</w> <w data-w="was">was</w> <w data-w="formed">formed</w>, <w data-w="by">by</w> <w data-w="careful">careful</w> <w data-w="selection" data-k="selection">selection</w>, <w data-w="to">to</w> <w data-w="rewrite">rewrite</w> <w data-w="the">the</w> <w data-w="specification" data-k="specification">specification</w> <w data-w="for">for</w> <w data-w="every">every</w> <w data-w="audit">audit</w>; <w data-w="the">the</w> <w data-w="first">first</w> <w data-w="draft">draft</w> <w data-w="ran">ran</w> <w data-w="to">to</w> <w data-w="forty">forty</w> <w data-w="pages">pages</w> <w data-w="and">and</w> <w data-w="was">was</w>, <w data-w="in">in</w> <w data-w="places">places</w>, <w data-w="barely">barely</w> <w data-w="readable">readable</w>.</p>
+
+<p class="zh" lang="zh-CN">结案那天，全镇的人聚在旧歌剧院——在民主制度下，那是唯一一个可以大声抱怨而不至于被孤立的地方。镇长借这个晚上点出了制度底下的软肋：信任太多，核查太少。“我们对自己的账已经陌生了，”他说，“这才是最彻底的耻辱。”一个委员会经过仔细挑选组建起来，负责重写每一项审计的规范；初稿写了四十页，有些地方几乎没法读。</p>
+
+<p><w data-w="five">Five</w> <w data-w="years">years</w> <w data-w="later">later</w> <w data-w="she">she</w> <w data-w="came">came</w> <w data-w="back">back</w> — <w data-w="a">a</w> <w data-w="graduate" data-k="graduate">graduate</w> <w data-w="who">who</w> <w data-w="had">had</w> <w data-w="chosen">chosen</w> <w data-w="to">to</w> <w data-w="specialize" data-k="specialize">specialize</w> <w data-w="in">in</w> <w data-w="quiet">quiet</w> <w data-w="fraud">fraud</w>, <w data-w="with">with</w> <w data-w="a">a</w> <w data-w="specialty" data-k="specialty">specialty</w> <w data-w="in">in</w> <w data-w="audit">audit</w> <w data-w="statistics">statistics</w> — <w data-w="and">and</w> <w data-w="walked">walked</w> <w data-w="towards" data-k="towards">towards</w> <w data-w="the">the</w> <w data-w="same">same</w> <w data-w="warehouse">warehouse</w>. <w data-w="little">Little</w> <w data-w="had">had</w> <w data-w="changed">changed</w> <w data-w="except">except</w> <w data-w="the">the</w> <w data-w="files">files</w>, <w data-w="which">which</w> <w data-w="had">had</w> <w data-w="improved">improved</w> <w data-w="by">by</w> <w data-w="gradual" data-k="gradual">gradual</w> <w data-w="steps">steps</w> <w data-w="and">and</w> <w data-w="with">with</w> <w data-w="the">the</w> <w data-w="aid" data-k="aid">aid</w> <w data-w="of">of</w> <w data-w="better">better</w> <w data-w="software">software</w>. <w data-w="she">She</w> <w data-w="expected">expected</w> <w data-w="to">to</w> <w data-w="encounter" data-k="encounter">encounter</w> <w data-w="old">old</w> <w data-w="faces">faces</w>; <w data-w="instead">instead</w> <w data-w="she">she</w> <w data-w="found">found</w> <w data-w="a">a</w> <w data-w="generation">generation</w> <w data-w="that">that</w> <w data-w="had">had</w> <w data-w="never">never</w> <w data-w="heard">heard</w> <w data-w="of">of</w> <w data-w="the">the</w> <w data-w="scandal">scandal</w>, <w data-w="now">now</w> <w data-w="a">a</w> <w data-w="species" data-k="species">species</w> <w data-w="of">of</w> <w data-w="local">local</w> <w data-w="myth">myth</w>. <w data-w="yet">Yet</w> <w data-w="every">every</w> <w data-w="quarter">quarter</w>, <w data-w="when">when</w> <w data-w="the">the</w> <w data-w="alarm" data-k="alarm">alarm</w> <w data-w="sounded">sounded</w> <w data-w="over">over</w> <w data-w="some">some</w> <w data-w="discrepancy">discrepancy</w>, <w data-w="someone">someone</w> <w data-w="remembered">remembered</w> <w data-w="her">her</w> <w data-w="name">name</w>, <w data-w="and">and</w> <w data-w="the">the</w> <w data-w="town">town</w> <w data-w="grew">grew</w> <w data-w="a">a</w> <w data-w="little">little</w> <w data-w="more">more</w> <w data-w="careful">careful</w> <w data-w="with">with</w> <w data-w="its">its</w> <w data-w="thrift" data-k="thrift">thrift</w>.</p>
+
+<p class="zh" lang="zh-CN">五年后她回来了——一个决心专攻“安静造假”的毕业生，专业是审计统计——朝同一座仓库走去。除了档案，几乎没什么变化；档案靠着更好的软件、一步一步慢慢改进过了。她以为会遇见旧面孔，结果遇到的是一整代人：他们从没听过那桩丑闻，它如今已成了本地传说的一种。但每个季度，当某处账目对不上、警报响起时，总有人想起她的名字；而这座小镇对自己那点积蓄，也变得更谨慎了一些。</p>
+
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--v)"></i>动词 v.</span>
+      <span><i style="background:var(--n)"></i>名词 n.</span>
+      <span><i style="background:var(--adj)"></i>形容词 adj.</span>
+      <span><i style="background:var(--adv)"></i>副词 adv.</span>
+      <span style="margin-left:auto;color:#9c8f7c">正文 709 个单词（370 个词形）全部可点 · 虚线为 103 个重点词</span>
+    </div>
+    <p class="src">词表来源：你手写笔记的截图（iCloud 备忘录链接需登录，无法直接抓取，按截图逐词识别）。故事为重新编排的原创段落，单词顺序已打乱。</p>
+  </section>
+
+  <!-- ============ 词卡 ============ -->
+  <section id="cards">
+    <p class="hint">已按随机顺序洗牌。点一张卡片翻出中文，再点一次收起。</p>
+    <div class="cardgrid" id="cardgrid"></div>
+  </section>
+
+</div>
+
+<div id="pop" role="tooltip" aria-hidden="true"></div>
+
+<div class="tools">
+  <button id="btnTrans" title="显示每一段的中文全文翻译">译文</button>
+  <button id="btnGloss" title="在每个重点词后显示中文释义">对照</button>
+  <button id="btnReset">重置</button>
+  <div class="sep"></div>
+  <button id="btnShuffle">重新打乱</button>
+</div>
+
+<script>
+/* ---------- 词库：词形 / 词性 / 中文 / 英文释义 ---------- */
+const D = {
+  outset:{p:"n.",cn:"开始，开端",en:"the start of something"},
+  brief:{p:"adj.",cn:"简短的；短暂的",en:"short in time or length"},
+  fairly:{p:"adv.",cn:"相当地；公平地",en:"to a moderate degree; justly"},
+  rail:{p:"n.",cn:"铁路；栏杆",en:"a railway; a bar along a track"},
+  zone:{p:"n.",cn:"地区，区域",en:"an area with a particular purpose"},
+  paragraph:{p:"n.",cn:"段落",en:"a section of a piece of writing"},
+  vary:{p:"v.",cn:"变化，不同",en:"to differ or change"},
+  specify:{p:"v.",cn:"明确说明，具体指定",en:"to state exactly and clearly"},
+  specialist:{p:"n.",cn:"专家，专业人员",en:"an expert in a particular field"},
+  compile:{p:"v.",cn:"汇编，编纂；编译",en:"to collect and arrange materials"},
+  compare:{p:"v.",cn:"比较，对比",en:"to examine how things are alike"},
+  estimate:{p:"v./n.",cn:"估计，估算",en:"to judge an amount roughly"},
+  percentage:{p:"n.",cn:"百分比，比例",en:"a rate or proportion per hundred"},
+  goods:{p:"n.",cn:"商品，货物",en:"things made to be sold"},
+  employer:{p:"n.",cn:"雇主",en:"a person or firm that pays others to work"},
+  scope:{p:"n.",cn:"范围；余地",en:"the extent of an area or subject"},
+  aim:{p:"n./v.",cn:"目标；瞄准",en:"a purpose; to point at a target"},
+  variation:{p:"n.",cn:"变化，变动；变异",en:"a change in amount or form"},
+  trace:{p:"v./n.",cn:"追踪；痕迹",en:"to follow or find by small signs"},
+  terminate:{p:"v.",cn:"终止，结束",en:"to bring to an end"},
+  welfare:{p:"n.",cn:"福利；福祉",en:"health, comfort and state support"},
+  indication:{p:"n.",cn:"迹象，指示",en:"a sign that something exists"},
+  vague:{p:"adj.",cn:"模糊的，含糊的",en:"not clear or exact"},
+  whisper:{p:"v./n.",cn:"低语，耳语",en:"to speak very softly"},
+  vanish:{p:"v.",cn:"消失，突然不见",en:"to disappear suddenly"},
+  alternate:{p:"adj./v.",cn:"交替的；轮流",en:"every other one; to take turns"},
+  weary:{p:"adj.",cn:"疲惫的，厌倦的",en:"very tired"},
+  random:{p:"adj.",cn:"随机的，随意的",en:"chosen without a pattern"},
+  underestimate:{p:"v.",cn:"低估",en:"to think something is smaller than it is"},
+  variance:{p:"n.",cn:"差异；方差",en:"difference from an expected value"},
+  tentative:{p:"adj.",cn:"试探性的，暂定的",en:"not certain or final yet"},
+  target:{p:"n./v.",cn:"目标；把…作为目标",en:"an aim; to aim at"},
+  allocate:{p:"v.",cn:"分配，拨给",en:"to give out for a purpose"},
+  track:{p:"v./n.",cn:"追踪；轨迹",en:"to follow the course of something"},
+  emphasis:{p:"n.",cn:"强调，重点",en:"special importance given to something"},
+  aggregate:{p:"n./adj.",cn:"总计；合计的",en:"a total formed from several parts"},
+  alarm:{p:"n./v.",cn:"警报；使惊恐",en:"a warning sound; to frighten"},
+  partial:{p:"adj.",cn:"部分的；偏袒的",en:"not complete; favouring one side"},
+  complete:{p:"adj./v.",cn:"完整的；完成",en:"whole; to finish"},
+  alteration:{p:"n.",cn:"改变，改动",en:"a change made to something"},
+  special:{p:"adj.",cn:"特别的，专门的",en:"different from the usual"},
+  specific:{p:"adj.",cn:"具体的，特定的",en:"clearly defined and exact"},
+  comparable:{p:"adj.",cn:"可比较的，类似的",en:"able to be compared; similar"},
+  range:{p:"n./v.",cn:"范围；变动",en:"the limits between which things vary"},
+  indicative:{p:"adj.",cn:"指示的，表明的",en:"showing that something is true"},
+  bias:{p:"n.",cn:"偏见，偏差",en:"an unfair leaning for or against"},
+  score:{p:"v./n.",cn:"得分；分数",en:"to gain points; a result"},
+  deny:{p:"v.",cn:"否认；拒绝给予",en:"to say something is not true"},
+  testify:{p:"v.",cn:"作证，证明",en:"to give evidence in court"},
+  valid:{p:"adj.",cn:"有效的，正当的",en:"legally or logically sound"},
+  competent:{p:"adj.",cn:"有能力的，胜任的",en:"having enough skill to do a job"},
+  temporary:{p:"adj.",cn:"暂时的，临时的",en:"lasting only a short time"},
+  aggravate:{p:"v.",cn:"加重，使恶化；激怒",en:"to make worse"},
+  temporal:{p:"adj.",cn:"时间的；世俗的",en:"relating to time"},
+  compel:{p:"v.",cn:"强迫，迫使",en:"to force someone to do something"},
+  undergo:{p:"v.",cn:"经历，遭受",en:"to experience something difficult"},
+  wear:{p:"v.",cn:"磨损；穿着",en:"to damage by use; to have on the body"},
+  compensate:{p:"v.",cn:"补偿，弥补",en:"to make up for a loss"},
+  peer:{p:"n.",cn:"同龄人，同辈",en:"a person of the same age or rank"},
+  aggressive:{p:"adj.",cn:"好斗的；积极进取的",en:"forceful; very determined"},
+  brisk:{p:"adj.",cn:"轻快的，敏捷的",en:"quick and energetic"},
+  oppress:{p:"v.",cn:"压迫；使压抑",en:"to treat cruelly; to weigh down"},
+  fear:{p:"n./v.",cn:"恐惧，害怕",en:"the feeling of being afraid"},
+  whirl:{p:"v./n.",cn:"旋转，回旋",en:"to turn round very fast"},
+  opportunity:{p:"n.",cn:"机会，时机",en:"a chance to do something"},
+  charm:{p:"n./v.",cn:"魅力；吸引",en:"the power to please people"},
+  endorse:{p:"v.",cn:"支持，赞同；代言",en:"to say publicly that you support"},
+  agreeable:{p:"adj.",cn:"令人愉快的；欣然同意的",en:"pleasant; willing to agree"},
+  agitate:{p:"v.",cn:"搅动；煽动，鼓动",en:"to stir up; to campaign publicly"},
+  opponent:{p:"n.",cn:"对手，反对者",en:"someone who competes against you"},
+  alter:{p:"v.",cn:"改变，更改",en:"to change something"},
+  diffuse:{p:"v./adj.",cn:"扩散；弥漫的",en:"to spread out widely"},
+  competition:{p:"n.",cn:"竞争，比赛",en:"a contest between rivals"},
+  fair:{p:"adj.",cn:"公平的；相当的",en:"treating everyone equally"},
+  compete:{p:"v.",cn:"竞争，比赛",en:"to try to win against others"},
+  outrage:{p:"n.",cn:"愤怒；暴行",en:"great anger; a shocking act"},
+  term:{p:"n.",cn:"术语；期限；条款",en:"a word; a fixed period"},
+  opera:{p:"n.",cn:"歌剧",en:"a play set to music"},
+  democracy:{p:"n.",cn:"民主，民主制度",en:"government by the people"},
+  complain:{p:"v.",cn:"抱怨，投诉",en:"to say you are unhappy about something"},
+  alienate:{p:"v.",cn:"使疏远，使孤立",en:"to make someone feel unwelcome"},
+  highlight:{p:"v.",cn:"突出，强调",en:"to draw attention to"},
+  underlying:{p:"adj.",cn:"潜在的，根本的",en:"hidden but important"},
+  alien:{p:"adj./n.",cn:"外国的；陌生的；外星人",en:"foreign; strange; a being from space"},
+  utter:{p:"adj./v.",cn:"完全的；说出",en:"complete; to say aloud"},
+  selection:{p:"n.",cn:"选择，挑选",en:"the act of choosing"},
+  specification:{p:"n.",cn:"规格，说明书",en:"a detailed description of requirements"},
+  graduate:{p:"n./v.",cn:"毕业生；毕业",en:"a person who has finished a degree"},
+  specialty:{p:"n.",cn:"专业，专长；特产",en:"a field you are expert in"},
+  specialize:{p:"v.",cn:"专门研究，专攻",en:"to focus on one subject"},
+  towards:{p:"prep.",cn:"朝，向；对于",en:"in the direction of"},
+  gradual:{p:"adj.",cn:"逐渐的，渐进的",en:"happening slowly, step by step"},
+  aid:{p:"n./v.",cn:"帮助，援助",en:"help or support"},
+  encounter:{p:"v./n.",cn:"遭遇，偶遇",en:"to meet, especially unexpectedly"},
+  species:{p:"n.",cn:"物种，种类",en:"a group of similar living things"},
+  thrift:{p:"n.",cn:"节俭，节约",en:"careful use of money"},
+  oppose:{p:"v.",cn:"反对，抵制",en:"to disagree with and try to stop"},
+  alternative:{p:"n./adj.",cn:"替代方案；可供选择的",en:"another choice or possibility"},
+  competitive:{p:"adj.",cn:"有竞争力的；好胜的",en:"wanting very much to win"},
+  endeavor:{p:"n./v.",cn:"努力，尽力",en:"a serious attempt"},
+  indicate:{p:"v.",cn:"表明，指示",en:"to show or point out"},
+  speculate:{p:"v.",cn:"推测，猜测；投机",en:"to guess without firm evidence"},
+  weird:{p:"adj.",cn:"奇怪的，怪异的",en:"very strange"}
+};
+
+const W = {
+  "a":{c:"一个；每一",t:"art."},
+  "about":{c:"关于；大约",t:"prep."},
+  "accounts":{c:"账目（复数）",t:"n."},
+  "across":{c:"横过；遍及",t:"prep."},
+  "advantage":{c:"优势，好处",t:"n."},
+  "again":{c:"再次",t:"adv."},
+  "almost":{c:"几乎",t:"adv."},
+  "aloud":{c:"出声地",t:"adv."},
+  "always":{c:"总是",t:"adv."},
+  "an":{c:"一个",t:"art."},
+  "and":{c:"和",t:"conj."},
+  "another":{c:"另一个",t:"det."},
+  "answer":{c:"答案",t:"n."},
+  "any":{c:"任何",t:"det."},
+  "anyone":{c:"任何人",t:"pron."},
+  "anything":{c:"任何事物",t:"pron."},
+  "as":{c:"作为；如同",t:"conj."},
+  "asked":{c:"问；要求（ask 的过去式）",t:"v."},
+  "assistants":{c:"助手（复数）",t:"n."},
+  "at":{c:"在（某处／某时）",t:"prep."},
+  "audit":{c:"审计",t:"n."},
+  "back":{c:"回来；向后",t:"adv."},
+  "barely":{c:"几乎不",t:"adv."},
+  "been":{c:"是（be 的过去分词）",t:"v."},
+  "before":{c:"在…之前",t:"prep."},
+  "began":{c:"开始（begin 的过去式）",t:"v."},
+  "beginning":{c:"开始（begin 的现在分词）",t:"v."},
+  "behalf":{c:"代表（on behalf of 代表…）",t:"n."},
+  "being":{c:"被；存在（be 的现在分词）",t:"v."},
+  "best":{c:"最好的",t:"adj."},
+  "better":{c:"更好的",t:"adj."},
+  "between":{c:"在…之间",t:"prep."},
+  "board":{c:"董事会",t:"n."},
+  "books":{c:"账簿（复数）",t:"n."},
+  "budget":{c:"预算",t:"n."},
+  "building":{c:"建立（build 的现在分词）",t:"v."},
+  "bureau":{c:"局，办事处",t:"n."},
+  "but":{c:"但是",t:"conj."},
+  "by":{c:"由；通过；在…旁",t:"prep."},
+  "called":{c:"称为（call 的过去分词）",t:"v."},
+  "came":{c:"来（come 的过去式）",t:"v."},
+  "can":{c:"能够",t:"aux."},
+  "cannot":{c:"不能",t:"aux."},
+  "careful":{c:"小心的，谨慎的",t:"adj."},
+  "case":{c:"案件；情况",t:"n."},
+  "changed":{c:"改变（change 的过去式）",t:"v."},
+  "charge":{c:"指控；收费",t:"n."},
+  "checking":{c:"核查（check 的动名词）",t:"n."},
+  "chosen":{c:"选择（choose 的过去分词）",t:"v."},
+  "clerk":{c:"职员",t:"n."},
+  "closed":{c:"结束；关闭（close 的过去式）",t:"v."},
+  "committee":{c:"委员会",t:"n."},
+  "contract":{c:"合同",t:"n."},
+  "could":{c:"能够；可能",t:"aux."},
+  "court":{c:"法庭",t:"n."},
+  "cut":{c:"削减；切断",t:"v."},
+  "day":{c:"天，日子",t:"n."},
+  "delay":{c:"延迟",t:"n."},
+  "department":{c:"部门",t:"n."},
+  "discrepancy":{c:"差异，不符之处",t:"n."},
+  "do":{c:"做",t:"v."},
+  "docks":{c:"码头",t:"n."},
+  "draft":{c:"草稿",t:"n."},
+  "dull":{c:"枯燥的，乏味的",t:"adj."},
+  "each":{c:"每个",t:"det."},
+  "enjoyed":{c:"享受（enjoy 的过去式）",t:"v."},
+  "entry":{c:"条目，记录",t:"n."},
+  "error":{c:"错误",t:"n."},
+  "evening":{c:"晚上",t:"n."},
+  "every":{c:"每个",t:"det."},
+  "exactly":{c:"确切地，正是",t:"adv."},
+  "except":{c:"除…之外",t:"prep."},
+  "expected":{c:"期待；预计（expect 的过去式）",t:"v."},
+  "explain":{c:"解释",t:"v."},
+  "faces":{c:"面孔（复数）",t:"n."},
+  "few":{c:"少数，几个",t:"adj."},
+  "files":{c:"档案（复数）",t:"n."},
+  "find":{c:"找到",t:"v."},
+  "firm":{c:"公司",t:"n."},
+  "first":{c:"第一个；首先",t:"adj."},
+  "five":{c:"五",t:"num."},
+  "for":{c:"为了；对于",t:"prep."},
+  "formed":{c:"组建（form 的过去分词）",t:"v."},
+  "forty":{c:"四十",t:"num."},
+  "found":{c:"发现（find 的过去式）；建立",t:"v."},
+  "fraud":{c:"欺诈，造假",t:"n."},
+  "freight":{c:"货运；货物",t:"n."},
+  "from":{c:"从；来自",t:"prep."},
+  "gap":{c:"缺口，空白",t:"n."},
+  "gave":{c:"给（give 的过去式）",t:"v."},
+  "generation":{c:"一代人",t:"n."},
+  "gentlemanly":{c:"绅士般的，体面的",t:"adj."},
+  "grew":{c:"变得；生长（grow 的过去式）",t:"v."},
+  "grown":{c:"成长（grow 的过去分词）",t:"v."},
+  "had":{c:"有（have 的过去式／过去分词）",t:"v."},
+  "he":{c:"他",t:"pron."},
+  "heard":{c:"听说（hear 的过去式）",t:"v."},
+  "held":{c:"举行；握住（hold 的过去式）",t:"v."},
+  "helped":{c:"帮助（help 的过去式）",t:"v."},
+  "her":{c:"她；她的",t:"pron."},
+  "herself":{c:"她自己",t:"pron."},
+  "him":{c:"他（宾格）",t:"pron."},
+  "his":{c:"他的",t:"pron."},
+  "hit":{c:"打击；冲击",t:"n."},
+  "hour":{c:"小时",t:"n."},
+  "house":{c:"房子；场馆",t:"n."},
+  "however":{c:"然而",t:"adv."},
+  "improved":{c:"改进（improve 的过去分词）",t:"v."},
+  "in":{c:"在…里",t:"prep."},
+  "ink":{c:"墨水",t:"n."},
+  "instead":{c:"代替；反而",t:"adv."},
+  "invoices":{c:"发票（复数）",t:"n."},
+  "is":{c:"是",t:"v."},
+  "it":{c:"它",t:"pron."},
+  "its":{c:"它的",t:"pron."},
+  "itself":{c:"它自己",t:"pron."},
+  "joked":{c:"开玩笑（joke 的过去式）",t:"v."},
+  "keep":{c:"保留；保持",t:"v."},
+  "larger":{c:"更大的",t:"adj."},
+  "later":{c:"后来",t:"adv."},
+  "learned":{c:"学会（learn 的过去分词）",t:"v."},
+  "ledger":{c:"账簿",t:"n."},
+  "like":{c:"像；如同",t:"prep."},
+  "line":{c:"行；线路",t:"n."},
+  "little":{c:"很少的；小的",t:"adj."},
+  "local":{c:"当地的",t:"adj."},
+  "look":{c:"寻找；看",t:"v."},
+  "lost":{c:"失去（lose 的过去分词）",t:"v."},
+  "market":{c:"市场",t:"n."},
+  "may":{c:"可以；可能",t:"aux."},
+  "mayor":{c:"镇长，市长",t:"n."},
+  "means":{c:"手段，方式",t:"n."},
+  "mentor":{c:"导师",t:"n."},
+  "met":{c:"遇见（meet 的过去式）",t:"v."},
+  "mistake":{c:"错误",t:"n."},
+  "month":{c:"月",t:"n."},
+  "months":{c:"月（复数）",t:"n."},
+  "more":{c:"更多",t:"adv."},
+  "much":{c:"很多",t:"adv."},
+  "myth":{c:"传说，神话",t:"n."},
+  "name":{c:"名字",t:"n."},
+  "names":{c:"名字（复数）",t:"n."},
+  "never":{c:"从不",t:"adv."},
+  "new":{c:"新的",t:"adj."},
+  "next":{c:"下一个",t:"adj."},
+  "no":{c:"没有；不",t:"det."},
+  "noise":{c:"噪声",t:"n."},
+  "not":{c:"不",t:"adv."},
+  "now":{c:"现在",t:"adv."},
+  "numbers":{c:"数字（复数）",t:"n."},
+  "of":{c:"…的",t:"prep."},
+  "off":{c:"（go off）响起；离开",t:"adv."},
+  "offered":{c:"提供（offer 的过去式）",t:"v."},
+  "office":{c:"办公室",t:"n."},
+  "old":{c:"旧的；年老的",t:"adj."},
+  "on":{c:"在…上",t:"prep."},
+  "one":{c:"一个",t:"num."},
+  "only":{c:"仅仅",t:"adv."},
+  "ordinary":{c:"普通的，平常的",t:"adj."},
+  "other":{c:"其他的",t:"adj."},
+  "our":{c:"我们的",t:"pron."},
+  "out":{c:"出去；用尽",t:"adv."},
+  "outlast":{c:"比…持续得更久",t:"v."},
+  "over":{c:"在…之上；超过",t:"prep."},
+  "own":{c:"自己的",t:"adj."},
+  "page":{c:"页",t:"n."},
+  "pages":{c:"页（复数）",t:"n."},
+  "paid":{c:"支付（pay 的过去分词）",t:"v."},
+  "pairs":{c:"双，对（复数）",t:"n."},
+  "pattern":{c:"模式，规律",t:"n."},
+  "pension":{c:"养老金",t:"n."},
+  "place":{c:"地方",t:"n."},
+  "places":{c:"地方（复数）",t:"n."},
+  "preferred":{c:"更喜欢（prefer 的过去式）",t:"v."},
+  "proved":{c:"证明（prove 的过去式）",t:"v."},
+  "puzzle":{c:"谜题",t:"n."},
+  "quarter":{c:"季度",t:"n."},
+  "quiet":{c:"安静的",t:"adj."},
+  "quit":{c:"退出，放弃",t:"v."},
+  "ran":{c:"延伸；跑（run 的过去式）",t:"v."},
+  "reached":{c:"到达（reach 的过去分词）",t:"v."},
+  "readable":{c:"可读的",t:"adj."},
+  "record":{c:"记录",t:"n."},
+  "remembered":{c:"记得（remember 的过去式）",t:"v."},
+  "report":{c:"报告",t:"n."},
+  "resign":{c:"辞职",t:"v."},
+  "return":{c:"返回",t:"v."},
+  "rewrite":{c:"重写",t:"v."},
+  "rival":{c:"对手，竞争者",t:"n."},
+  "said":{c:"说（say 的过去式）",t:"v."},
+  "same":{c:"相同的",t:"adj."},
+  "scandal":{c:"丑闻",t:"n."},
+  "season":{c:"季节；一段时期",t:"n."},
+  "seemed":{c:"似乎（seem 的过去式）",t:"v."},
+  "set":{c:"设定；放置（set 的过去式）",t:"v."},
+  "settlement":{c:"和解，了结",t:"n."},
+  "shame":{c:"耻辱",t:"n."},
+  "she":{c:"她",t:"pron."},
+  "shipments":{c:"货运批次（复数）",t:"n."},
+  "shoes":{c:"鞋（复数）",t:"n."},
+  "short":{c:"短的；短缺的",t:"adj."},
+  "shows":{c:"显示（show 的第三人称单数）",t:"v."},
+  "side":{c:"一边，一方",t:"n."},
+  "simple":{c:"简单的",t:"adj."},
+  "simplicity":{c:"简单，简明",t:"n."},
+  "simply":{c:"仅仅；只是",t:"adv."},
+  "single":{c:"单一的，单个的",t:"adj."},
+  "sleep":{c:"睡眠",t:"n."},
+  "small":{c:"小的",t:"adj."},
+  "software":{c:"软件",t:"n."},
+  "some":{c:"一些",t:"det."},
+  "someone":{c:"某人",t:"pron."},
+  "sounded":{c:"响起；听起来（sound 的过去式）",t:"v."},
+  "spread":{c:"传播，蔓延",t:"v."},
+  "statistics":{c:"统计；统计数字",t:"n."},
+  "steps":{c:"步骤（复数）",t:"n."},
+  "stolen":{c:"偷（steal 的过去分词）",t:"v."},
+  "stubbornness":{c:"固执，倔强",t:"n."},
+  "system":{c:"系统，制度",t:"n."},
+  "task":{c:"任务",t:"n."},
+  "than":{c:"比",t:"conj."},
+  "that":{c:"那；那个",t:"pron."},
+  "the":{c:"这；那（定冠词）",t:"art."},
+  "them":{c:"他们；它们",t:"pron."},
+  "then":{c:"然后；那时",t:"adv."},
+  "think":{c:"认为，想",t:"v."},
+  "this":{c:"这个",t:"pron."},
+  "through":{c:"穿过；通过",t:"prep."},
+  "times":{c:"时候；次数（复数）",t:"n."},
+  "to":{c:"到；向",t:"prep."},
+  "too":{c:"太；也",t:"adv."},
+  "took":{c:"接受；拿（take 的过去式）",t:"v."},
+  "totals":{c:"总数（复数）",t:"n."},
+  "town":{c:"镇，小城",t:"n."},
+  "town's":{c:"镇上的（town 的所有格）",t:"n."},
+  "trust":{c:"信任",t:"n."},
+  "twin":{c:"孪生的；配对之物",t:"n."},
+  "two":{c:"两个",t:"num."},
+  "under":{c:"在…下面",t:"prep."},
+  "union":{c:"工会",t:"n."},
+  "used":{c:"使用（use 的过去分词）",t:"v."},
+  "walked":{c:"走（walk 的过去式）",t:"v."},
+  "wanted":{c:"想要（want 的过去式）",t:"v."},
+  "warehouse":{c:"仓库",t:"n."},
+  "warned":{c:"警告（warn 的过去式）",t:"v."},
+  "was":{c:"是（be 的过去式）",t:"v."},
+  "water":{c:"水",t:"n."},
+  "ways":{c:"方式（复数）",t:"n."},
+  "we":{c:"我们",t:"pron."},
+  "weakness":{c:"弱点，软肋",t:"n."},
+  "went":{c:"去（go 的过去式）",t:"v."},
+  "what":{c:"什么",t:"pron."},
+  "when":{c:"当…时",t:"conj."},
+  "where":{c:"在哪里",t:"adv."},
+  "which":{c:"哪一个；那个",t:"pron."},
+  "who":{c:"谁",t:"pron."},
+  "whole":{c:"整个的",t:"adj."},
+  "why":{c:"为什么",t:"adv."},
+  "wide":{c:"宽的；广泛的",t:"adj."},
+  "with":{c:"和…一起；带有",t:"prep."},
+  "without":{c:"没有",t:"prep."},
+  "work":{c:"工作",t:"n."},
+  "would":{c:"将会；总是（过去习惯）",t:"aux."},
+  "years":{c:"年（复数）",t:"n."},
+  "yet":{c:"然而；还",t:"adv."},
+  "you":{c:"你",t:"pron."},
+  "young":{c:"年轻的",t:"adj."}
+};
+
+const Total = Object.keys(D).length;
+const POS_COLOR = {"v.":"var(--v)","n.":"var(--n)","adj.":"var(--adj)","adv.":"var(--adv)"};
+const seen = new Set();
+
+/* ---------- init passage ---------- */
+const words = [...document.querySelectorAll("#passage w")];
+words.forEach(w=>{
+  const k = w.dataset.k;
+  const d = k ? D[k] : null;
+  if(d){
+    w.dataset.cn = d.cn.split(/[，,；;]/)[0];
+    w.dataset.pos = d.p;
+  } else {
+    const e = W[(w.dataset.w || w.textContent).toLowerCase()];
+    if(e) w.dataset.cn = e.c.split(/[，,；;]/)[0];
+  }
+  if(!d){
+    w.tabIndex = 0;
+    w.setAttribute("role","button");
+    return;
+  }
+  w.tabIndex = 0;
+  w.setAttribute("role","button");
+  w.style.borderBottomColor = (POS_COLOR[d.p]||"rgba(184,69,47,.45)").replace("var(--v)","rgba(47,111,106,.5)").replace("var(--n)","rgba(138,90,43,.5)").replace("var(--adj)","rgba(107,82,163,.5)").replace("var(--adv)","rgba(63,110,168,.5)");
+});
+
+/* ---------- popover ---------- */
+const pop = document.getElementById("pop");
+let activeEl = null;
+
+function showPop(el){
+  const surface = (el.textContent || "").trim();
+  const low = (el.dataset.w || surface).toLowerCase();
+  const k = el.dataset.k || "";
+  let cn, pos, en = "", base = "";
+  if(k && D[k]){
+    cn = D[k].cn; pos = D[k].p; en = D[k].en;
+    if(low !== k) base = k;
+  } else if(W[low]){
+    cn = W[low].c; pos = W[low].t;
+  } else { return; }
+  pop.innerHTML = '<div class="row"><span class="w">'+escapeHtml(surface)+'</span><span class="pos">'+escapeHtml(pos)+'</span>'
+                + (k ? '<span class="tag">重点词</span>' : '') + '</div>'
+                + '<div class="cn">'+escapeHtml(cn)+'</div>'
+                + (en ? '<div class="en">'+escapeHtml(en)+'</div>' : '')
+                + (base ? '<div class="base">原形 · '+escapeHtml(base)+'</div>' : '');
+  const r = el.getBoundingClientRect();
+  pop.classList.add("on");
+  pop.classList.remove("below");
+  pop.style.left = "0px"; pop.style.top = "0px";
+  const pr = pop.getBoundingClientRect();
+  let left = r.left + r.width/2 - pr.width/2;
+  left = Math.max(10, Math.min(left, window.innerWidth - pr.width - 10));
+  let top = r.top - pr.height - 12;
+  let below = false;
+  if(top < 10){ top = r.bottom + 12; below = true; }
+  pop.style.left = left + "px";
+  pop.style.top = top + "px";
+  pop.style.setProperty("--ax", (r.left + r.width/2 - left) + "px");
+  pop.classList.toggle("below", below);
+  pop.setAttribute("aria-hidden","false");
+}
+
+function hidePop(){
+  pop.classList.remove("on");
+  pop.setAttribute("aria-hidden","true");
+  if(activeEl) activeEl.classList.remove("active");
+  activeEl = null;
+}
+
+function markSeen(el){
+  const k = el.dataset.k;
+  if(!k || !D[k]) return;
+  if(!seen.has(k)){
+    seen.add(k);
+    document.getElementById("cnt").textContent = seen.size;
+    document.getElementById("barFill").style.width = (seen.size/Total*100) + "%";
+  }
+  document.querySelectorAll('#passage w[data-k="'+k+'"]').forEach(x=>x.classList.add("seen"));
+  document.querySelectorAll('.card[data-k="'+k+'"]').forEach(x=>x.classList.add("open"));
+}
+
+function onWordTap(el){
+  if(activeEl === el){ hidePop(); return; }
+  if(activeEl) activeEl.classList.remove("active");
+  activeEl = el; el.classList.add("active");
+  markSeen(el);
+  showPop(el);
+}
+
+words.forEach(w=>{
+  w.addEventListener("click", e=>{ e.stopPropagation(); onWordTap(w); });
+  w.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onWordTap(w); }});
+});
+
+document.addEventListener("click", hidePop);
+window.addEventListener("scroll", ()=>hidePop(), {passive:true});
+window.addEventListener("resize", ()=>hidePop());
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") hidePop(); });
+
+/* ---------- tabs ---------- */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on", x===t));
+    const isRead = t.dataset.tab === "read";
+    document.getElementById("read").style.display = isRead ? "block" : "none";
+    document.getElementById("cards").style.display = isRead ? "none" : "block";
+    document.body.classList.toggle("cardmode", !isRead);
+    hidePop();
+  });
+});
+
+/* ---------- cards ---------- */
+const grid = document.getElementById("cardgrid");
+function shuffle(a){ const b=a.slice(); for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; }
+
+function renderCards(){
+  grid.innerHTML = "";
+  shuffle(Object.keys(D)).forEach((k,i)=>{
+    const d = D[k];
+    const c = document.createElement("div");
+    c.className = "card"; c.dataset.k = k;
+    if(seen.has(k)) c.classList.add("open");
+    c.innerHTML = '<span class="idx">'+String(i+1).padStart(2,"0")+'</span>'
+                + '<div class="en">'+escapeHtml(k)+'</div>'
+                + '<div class="cn">'+d.p+' '+escapeHtml(d.cn)+'</div>';
+    c.addEventListener("click", ()=>{ c.classList.toggle("open"); if(c.classList.contains("open")) markSeen(c); });
+    grid.appendChild(c);
+  });
+}
+renderCards();
+
+/* ---------- toolbar ---------- */
+document.getElementById("btnTrans").addEventListener("click", e=>{
+  e.stopPropagation();
+  document.body.classList.toggle("trans");
+  e.currentTarget.classList.toggle("on", document.body.classList.contains("trans"));
+  hidePop();
+});
+document.getElementById("btnGloss").addEventListener("click", e=>{
+  e.stopPropagation();
+  document.body.classList.toggle("gloss");
+  e.currentTarget.classList.toggle("on", document.body.classList.contains("gloss"));
+  hidePop();
+});
+document.getElementById("btnReset").addEventListener("click", e=>{
+  e.stopPropagation();
+  seen.clear();
+  document.getElementById("cnt").textContent = 0;
+  document.getElementById("barFill").style.width = "0%";
+  words.forEach(w=>w.classList.remove("seen","active"));
+  document.querySelectorAll(".card").forEach(c=>c.classList.remove("open"));
+  document.body.classList.remove("gloss","trans");
+  document.getElementById("btnGloss").classList.remove("on");
+  document.getElementById("btnTrans").classList.remove("on");
+  hidePop();
+});
+document.getElementById("btnShuffle").addEventListener("click", e=>{
+  e.stopPropagation();
+  renderCards();
+});
+
+/* util */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+</script>
+</body>
+</html>
